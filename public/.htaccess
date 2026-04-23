@@ -1,0 +1,11 @@
+Options -Indexes
+
+RewriteEngine On
+
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+RewriteRule ^watch/([^/]+)/?$ watch.php?id=$1 [QSA,L,NC,B]
+RewriteRule ^stream/([^/]+)/?$ stream.php?id=$1 [QSA,L,NC,B]
+

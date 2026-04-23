@@ -1,0 +1,14 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'base_url' => 'https://v.sitename.org',
+    'db_path' => __DIR__ . '/var/media_watch.sqlite',
+    'media_roots' => [
+        '/mnt/storage/Media/Video/Movie',
+        '/mnt/storage/Media/Video/Series',
+    ],
+    'site_name' => 'Media Watch',
+];
+

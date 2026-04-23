@@ -1,0 +1,5 @@
+/config.local.php
+/var/*.sqlite
+/var/*.sqlite-*
+/var/*.log
+
