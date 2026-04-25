@@ -7,6 +7,22 @@ starts.
 
 ## 2026-04-25
 
+### Watch page polish — description under the player, drop VLC hint
+
+- Move the description out of the header and into a full-width
+  block under the video. Wide screens were leaving the description
+  pinched at 60ch — now it spans the same width as the player.
+- Drop the «Скачайте файл и откройте в VLC» fallback line under
+  «Воспроизведение данного файла здесь невозможно» — the «📥 Скачать»
+  button below already covers that path.
+- Use the description fallback string only for the meta tags, not
+  for the visible body, so records with no description don't render
+  the placeholder.
+
+---
+
+## 2026-04-25
+
 ### Browser-playable proxy for non-mp4 originals
 
 - The watch page now serves the **original** file for download in

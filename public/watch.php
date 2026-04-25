@@ -22,9 +22,7 @@ if ($record === null) {
 
 $title = trim((string) ($record['title'] ?? 'Видео'));
 $description = trim((string) ($record['description'] ?? ''));
-if ($description === '') {
-    $description = 'Просмотр видео в браузере';
-}
+$ogDescription = $description !== '' ? $description : 'Просмотр видео в браузере';
 
 $posterUrl = trim((string) ($record['poster_url'] ?? ''));
 $mimeType = trim((string) ($record['mime_type'] ?? ''));
@@ -78,14 +76,14 @@ $ogVideoType = $playerMode === 'play_share' ? 'video/mp4' : $mimeType;
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($title) ?> · <?= e($siteName) ?></title>
-    <meta name="description" content="<?= e($description) ?>">
+    <meta name="description" content="<?= e($ogDescription) ?>">
     <meta name="robots" content="noindex">
 <?php if ($playerMode === 'pending'): ?>
     <meta http-equiv="refresh" content="20">
 <?php endif; ?>
 
     <meta property="og:title" content="<?= e($title) ?>">
-    <meta property="og:description" content="<?= e($description) ?>">
+    <meta property="og:description" content="<?= e($ogDescription) ?>">
     <meta property="og:type" content="video.movie">
     <meta property="og:url" content="<?= e($watchUrl) ?>">
 <?php if ($posterUrl !== ''): ?>
@@ -155,10 +153,13 @@ $ogVideoType = $playerMode === 'play_share' ? 'video/mp4' : $mimeType;
             font-size: clamp(1.5rem, 4vw, 2.5rem);
             line-height: 1.1;
         }
+        .description-block {
+            padding: 1rem 1.25rem 0;
+        }
         .description {
-            margin: 0.75rem 0 0;
+            margin: 0;
             color: var(--muted);
-            max-width: 60ch;
+            white-space: pre-line;
         }
         video {
             display: block;
@@ -209,7 +210,6 @@ $ogVideoType = $playerMode === 'play_share' ? 'video/mp4' : $mimeType;
     <div class="shell">
         <header>
             <h1><?= e($title) ?></h1>
-            <p class="description"><?= e($description) ?></p>
         </header>
 
 <?php if ($playerMode === 'play_original' || $playerMode === 'play_share'): ?>
@@ -234,10 +234,14 @@ $ogVideoType = $playerMode === 'play_share' ? 'video/mp4' : $mimeType;
 <?php else: ?>
         <div class="placeholder">
             <div>
-                <strong>Воспроизведение данного файла здесь невозможно.</strong><br>
-                Скачайте файл и откройте его в локальном плеере (например,
-                <a href="https://www.videolan.org/vlc/" rel="noopener noreferrer" target="_blank">VLC</a>).
+                <strong>Воспроизведение данного файла здесь невозможно.</strong>
             </div>
+        </div>
+<?php endif; ?>
+
+<?php if ($description !== ''): ?>
+        <div class="description-block">
+            <p class="description"><?= e($description) ?></p>
         </div>
 <?php endif; ?>
 
