@@ -30,6 +30,12 @@ $posterUrl = trim((string) ($record['poster_url'] ?? ''));
 $mimeType = trim((string) ($record['mime_type'] ?? ''));
 $watchUrl = full_url('/watch/' . rawurlencode($id));
 $streamUrl = full_url('/stream/' . rawurlencode($id));
+$downloadUrl = $streamUrl . '?download=1';
+$filename = trim(basename((string) ($record['file_path'] ?? '')));
+$ext = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
+// Browsers play H.264/AAC inside MP4 / WebM containers reliably; .mkv / .avi
+// / .ts /etc rarely work without a proper player, so we hint at downloading.
+$browserPlayable = in_array($ext, ['mp4', 'm4v', 'webm', 'ogg', 'ogv', 'mov'], true);
 $siteName = (string) app_config()['site_name'];
 ?>
 <!doctype html>
@@ -107,6 +113,34 @@ $siteName = (string) app_config()['site_name'];
             border-top: 1px solid var(--line);
             color: var(--muted);
             font-size: 0.95rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .meta .download {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .meta .filename {
+            font-size: 0.85rem;
+            opacity: 0.7;
+            word-break: break-all;
+        }
+        .meta .hint {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            background: rgba(148, 163, 184, 0.08);
+            border: 1px solid var(--line);
+            border-radius: 0.5rem;
+            padding: 0.6rem 0.8rem;
+        }
+        .meta .hint code {
+            background: rgba(148, 163, 184, 0.18);
+            padding: 0 0.3em;
+            border-radius: 0.25rem;
+            font-size: 0.85em;
         }
         a { color: #7dd3fc; }
     </style>
@@ -131,7 +165,20 @@ $siteName = (string) app_config()['site_name'];
         </video>
 
         <div class="meta">
-            <div>Ссылка: <a href="<?= e($watchUrl) ?>"><?= e($watchUrl) ?></a></div>
+            <div class="download">
+                📥 <a href="<?= e($downloadUrl) ?>" download="<?= e($filename) ?>">Скачать файл</a>
+<?php if ($filename !== ''): ?>
+                <span class="filename"><?= e($filename) ?></span>
+<?php endif; ?>
+            </div>
+<?php if (!$browserPlayable): ?>
+            <div class="hint">
+                Если видео не воспроизводится прямо в браузере, скачайте файл и
+                откройте в <a href="https://www.videolan.org/vlc/" rel="noopener noreferrer" target="_blank">VLC</a>
+                или другом плеере. Контейнер <code><?= e($ext) ?></code> часто
+                не поддерживается встроенным проигрывателем.
+            </div>
+<?php endif; ?>
         </div>
     </div>
 </main>

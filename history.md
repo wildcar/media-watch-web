@@ -7,6 +7,29 @@ starts.
 
 ## 2026-04-25
 
+### Replace bottom watch link with a download button
+
+- Replace the "Ссылка: <watch_url>" line at the bottom of the watch
+  page with a 📥 «Скачать файл» button that hits
+  `/stream/<id>?download=1`.
+- `Streamer::send` now takes an `$asAttachment` flag and emits
+  `Content-Disposition: attachment` instead of `inline` when set.
+- For containers the browser doesn't natively play (`.mkv`, `.avi`,
+  `.ts`, `.mpg`, `.wmv`, `.flv`), the page also shows a hint
+  recommending VLC and naming the offending extension. Whitelist of
+  natively-playable containers: mp4, m4v, webm, ogg, ogv, mov.
+
+### Document php-sqlite3 prerequisite
+
+Add an explicit "PHP extensions" section to `deploy/README.md`. Missing
+`php8.3-sqlite3` shows up as `500 Internal Server Error` with an empty
+body and `PDOException: could not find driver` in the Apache error log
+— surfaced during the first prod completion run.
+
+---
+
+## 2026-04-25
+
 ### HTTP registration API
 
 - Add `POST /api/register` and `DELETE /api/records/{id}` so the Telegram

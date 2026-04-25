@@ -3,10 +3,29 @@
 Target host assumptions:
 
 * Apache is already installed
-* PHP is already installed
+* PHP ≥ 8.1 is already installed
 * the host already sees the final media files on local disk
 * public hostname: `v.sitename.org`
 * deploy user: `www-data`
+
+## PHP extensions
+
+The application uses PDO + SQLite for the metadata registry, plus the
+standard `finfo` and `json` extensions. On a clean Ubuntu/Debian box
+with `php8.3-cli` installed, install the SQLite extension explicitly —
+it is **not** part of the base php package and a missing driver shows
+up only as a `500 Internal Server Error` with an empty body and a
+`PDOException: could not find driver` line in the Apache error log.
+
+    sudo apt install php8.3-sqlite3
+    sudo systemctl reload apache2  # or: sudo systemctl reload php8.3-fpm
+
+Adjust `8.3` to whatever PHP major.minor version your host runs
+(`php -v`). Verify with:
+
+    php -m | grep -i sqlite
+    # → pdo_sqlite
+    # → sqlite3
 
 ## Suggested layout
 

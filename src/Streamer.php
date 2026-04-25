@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 final class MediaWatchStreamer
 {
-    public static function send(string $path, string $mimeType, string $method = 'GET'): void
-    {
+    public static function send(
+        string $path,
+        string $mimeType,
+        string $method = 'GET',
+        bool $asAttachment = false,
+    ): void {
         if (!is_readable($path) || !is_file($path)) {
             http_response_code(404);
             header('Content-Type: text/plain; charset=UTF-8');
@@ -46,7 +50,11 @@ final class MediaWatchStreamer
         header_remove('X-Powered-By');
         header('Content-Type: ' . ($mimeType !== '' ? $mimeType : 'application/octet-stream'));
         header('Accept-Ranges: bytes');
-        header('Content-Disposition: inline; filename="' . addslashes(basename($path)) . '"');
+        $disposition = $asAttachment ? 'attachment' : 'inline';
+        header(
+            'Content-Disposition: ' . $disposition
+            . '; filename="' . addslashes(basename($path)) . '"'
+        );
         header('Cache-Control: private, max-age=0, must-revalidate');
         header('Content-Length: ' . $length);
 

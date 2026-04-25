@@ -29,5 +29,11 @@ if ($filePath === '' || !is_file($filePath)) {
 }
 
 $mimeType = trim((string) ($record['mime_type'] ?? ''));
-MediaWatchStreamer::send($filePath, $mimeType, (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+$asAttachment = isset($_GET['download']) && $_GET['download'] !== '' && $_GET['download'] !== '0';
+MediaWatchStreamer::send(
+    $filePath,
+    $mimeType,
+    (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'),
+    $asAttachment,
+);
 
