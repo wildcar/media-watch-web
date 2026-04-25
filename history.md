@@ -7,6 +7,35 @@ starts.
 
 ## 2026-04-25
 
+### Browser-playable proxy for non-mp4 originals
+
+- The watch page now serves the **original** file for download in
+  every case (unchanged), but renders the embedded `<video>` against
+  whatever is actually playable in browsers:
+  - Original is browser-friendly (`mp4`/`m4v`/`webm`) → play it.
+  - Original is `mkv`/etc but the video codec is H.264/HEVC →
+    asynchronously remux to mp4 in `/mnt/storage/Media/Video/Share/<id>.mp4`
+    (audio re-encoded to AAC only when source was AC3/DTS/etc),
+    then play that file. Until ready: page shows "Идёт подготовка
+    к воспроизведению…".
+  - Anything else → page renders "Воспроизведение данного файла
+    здесь невозможно" instead of the player.
+- New columns on `records`: `share_path`, `remux_status`
+  (`not_needed | pending | running | ready | failed`),
+  `remux_error`. Idempotent migrations as before.
+- `bin/remux-worker.php <id>` is the background worker; spawned by
+  `Storage::upsert` via `proc_open` + detached so the HTTP request
+  returns immediately. The worker holds an advisory `flock` on the
+  output file so a duplicate spawn no-ops cleanly.
+- `stream.php?share=1` serves the remuxed file with `Content-Type:
+  video/mp4`. Original `/stream/<id>` is unchanged.
+- No subtitle extraction, no original-file mutation, no rtorrent
+  side-effects. Per the user's revised spec.
+
+---
+
+## 2026-04-25
+
 ### ffprobe video dimensions for og:video:width/height
 
 - Telegram refuses to render an inline player from `og:video` alone —

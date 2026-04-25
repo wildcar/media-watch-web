@@ -31,14 +31,46 @@ $mimeType = trim((string) ($record['mime_type'] ?? ''));
 $videoWidth = (int) ($record['video_width'] ?? 0);
 $videoHeight = (int) ($record['video_height'] ?? 0);
 $watchUrl = full_url('/watch/' . rawurlencode($id));
-$streamUrl = full_url('/stream/' . rawurlencode($id));
-$downloadUrl = $streamUrl . '?download=1';
+$originalStreamUrl = full_url('/stream/' . rawurlencode($id));
+$shareStreamUrl = full_url('/stream/' . rawurlencode($id) . '?share=1');
+$downloadUrl = $originalStreamUrl . '?download=1';
 $filename = trim(basename((string) ($record['file_path'] ?? '')));
 $ext = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
-// Browsers play H.264/AAC inside MP4 / WebM containers reliably; .mkv / .avi
-// / .ts /etc rarely work without a proper player, so we hint at downloading.
-$browserPlayable = in_array($ext, ['mp4', 'm4v', 'webm', 'ogg', 'ogv', 'mov'], true);
 $siteName = (string) app_config()['site_name'];
+
+$remuxStatus = (string) ($record['remux_status'] ?? '');
+$browserPlayableExt = in_array($ext, ['mp4', 'm4v', 'webm', 'ogv', 'mov'], true);
+
+// Decide what (if anything) to render in place of the player.
+//   `play_original` → original file directly in <video>.
+//   `play_share`    → use the remuxed mp4 in /mnt/.../Share.
+//   `pending`       → "Идёт подготовка..." with meta-refresh.
+//   `unplayable`    → "Воспроизведение здесь невозможно".
+if ($browserPlayableExt || $remuxStatus === 'not_needed') {
+    $playerMode = 'play_original';
+    $playerSrc = $originalStreamUrl;
+    $playerMime = $mimeType !== '' ? $mimeType : 'video/mp4';
+} elseif ($remuxStatus === 'ready') {
+    $playerMode = 'play_share';
+    $playerSrc = $shareStreamUrl;
+    $playerMime = 'video/mp4';
+} elseif ($remuxStatus === 'pending' || $remuxStatus === 'running') {
+    $playerMode = 'pending';
+    $playerSrc = '';
+    $playerMime = '';
+} else {
+    $playerMode = 'unplayable';
+    $playerSrc = '';
+    $playerMime = '';
+}
+
+// og:video should point at whatever is actually playable, so Telegram
+// can build an inline preview. If nothing is playable yet, drop the
+// video tags entirely — clients will render a plain article card.
+$ogVideoUrl = $playerMode === 'play_original' || $playerMode === 'play_share'
+    ? $playerSrc
+    : '';
+$ogVideoType = $playerMode === 'play_share' ? 'video/mp4' : $mimeType;
 ?>
 <!doctype html>
 <html lang="ru">
@@ -48,6 +80,9 @@ $siteName = (string) app_config()['site_name'];
     <title><?= e($title) ?> · <?= e($siteName) ?></title>
     <meta name="description" content="<?= e($description) ?>">
     <meta name="robots" content="noindex">
+<?php if ($playerMode === 'pending'): ?>
+    <meta http-equiv="refresh" content="20">
+<?php endif; ?>
 
     <meta property="og:title" content="<?= e($title) ?>">
     <meta property="og:description" content="<?= e($description) ?>">
@@ -57,11 +92,12 @@ $siteName = (string) app_config()['site_name'];
     <meta property="og:image" content="<?= e($posterUrl) ?>">
 <?php endif; ?>
 
-    <meta property="og:video" content="<?= e($streamUrl) ?>">
-    <meta property="og:video:url" content="<?= e($streamUrl) ?>">
-    <meta property="og:video:secure_url" content="<?= e($streamUrl) ?>">
-<?php if ($mimeType !== ''): ?>
-    <meta property="og:video:type" content="<?= e($mimeType) ?>">
+<?php if ($ogVideoUrl !== ''): ?>
+    <meta property="og:video" content="<?= e($ogVideoUrl) ?>">
+    <meta property="og:video:url" content="<?= e($ogVideoUrl) ?>">
+    <meta property="og:video:secure_url" content="<?= e($ogVideoUrl) ?>">
+<?php if ($ogVideoType !== ''): ?>
+    <meta property="og:video:type" content="<?= e($ogVideoType) ?>">
 <?php endif; ?>
 <?php if ($videoWidth > 0 && $videoHeight > 0): ?>
     <meta property="og:video:width" content="<?= $videoWidth ?>">
@@ -69,14 +105,15 @@ $siteName = (string) app_config()['site_name'];
 <?php endif; ?>
 
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:player" content="<?= e($streamUrl) ?>">
-    <meta name="twitter:player:stream" content="<?= e($streamUrl) ?>">
-<?php if ($mimeType !== ''): ?>
-    <meta name="twitter:player:stream:content_type" content="<?= e($mimeType) ?>">
+    <meta name="twitter:player" content="<?= e($ogVideoUrl) ?>">
+    <meta name="twitter:player:stream" content="<?= e($ogVideoUrl) ?>">
+<?php if ($ogVideoType !== ''): ?>
+    <meta name="twitter:player:stream:content_type" content="<?= e($ogVideoType) ?>">
 <?php endif; ?>
 <?php if ($videoWidth > 0 && $videoHeight > 0): ?>
     <meta name="twitter:player:width" content="<?= $videoWidth ?>">
     <meta name="twitter:player:height" content="<?= $videoHeight ?>">
+<?php endif; ?>
 <?php endif; ?>
 
     <style>
@@ -130,6 +167,20 @@ $siteName = (string) app_config()['site_name'];
             background: #000;
             margin-top: 1rem;
         }
+        .placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 14rem;
+            margin-top: 1rem;
+            background: #000;
+            color: var(--muted);
+            text-align: center;
+            padding: 2rem 1rem;
+            font-size: 1.05rem;
+            line-height: 1.5;
+        }
+        .placeholder strong { color: var(--text); }
         .meta {
             padding: 1rem 1.25rem 1.25rem;
             border-top: 1px solid var(--line);
@@ -150,20 +201,6 @@ $siteName = (string) app_config()['site_name'];
             opacity: 0.7;
             word-break: break-all;
         }
-        .meta .hint {
-            font-size: 0.85rem;
-            line-height: 1.5;
-            background: rgba(148, 163, 184, 0.08);
-            border: 1px solid var(--line);
-            border-radius: 0.5rem;
-            padding: 0.6rem 0.8rem;
-        }
-        .meta .hint code {
-            background: rgba(148, 163, 184, 0.18);
-            padding: 0 0.3em;
-            border-radius: 0.25rem;
-            font-size: 0.85em;
-        }
         a { color: #7dd3fc; }
     </style>
 </head>
@@ -175,6 +212,7 @@ $siteName = (string) app_config()['site_name'];
             <p class="description"><?= e($description) ?></p>
         </header>
 
+<?php if ($playerMode === 'play_original' || $playerMode === 'play_share'): ?>
         <video
             controls
             preload="metadata"
@@ -182,9 +220,26 @@ $siteName = (string) app_config()['site_name'];
             poster="<?= e($posterUrl) ?>"
 <?php endif; ?>
         >
-            <source src="<?= e($streamUrl) ?>"<?= $mimeType !== '' ? ' type="' . e($mimeType) . '"' : '' ?>>
+            <source src="<?= e($playerSrc) ?>" type="<?= e($playerMime) ?>">
             Ваш браузер не поддерживает встроенное воспроизведение этого формата.
         </video>
+<?php elseif ($playerMode === 'pending'): ?>
+        <div class="placeholder">
+            <div>
+                <strong>Идёт подготовка к воспроизведению.</strong><br>
+                Файл перепаковывается в формат, понятный браузеру. Страница
+                обновится сама через 20 секунд.
+            </div>
+        </div>
+<?php else: ?>
+        <div class="placeholder">
+            <div>
+                <strong>Воспроизведение данного файла здесь невозможно.</strong><br>
+                Скачайте файл и откройте его в локальном плеере (например,
+                <a href="https://www.videolan.org/vlc/" rel="noopener noreferrer" target="_blank">VLC</a>).
+            </div>
+        </div>
+<?php endif; ?>
 
         <div class="meta">
             <div class="download">
@@ -193,17 +248,8 @@ $siteName = (string) app_config()['site_name'];
                 <span class="filename"><?= e($filename) ?></span>
 <?php endif; ?>
             </div>
-<?php if (!$browserPlayable): ?>
-            <div class="hint">
-                Если видео не воспроизводится прямо в браузере, скачайте файл и
-                откройте в <a href="https://www.videolan.org/vlc/" rel="noopener noreferrer" target="_blank">VLC</a>
-                или другом плеере. Контейнер <code><?= e($ext) ?></code> часто
-                не поддерживается встроенным проигрывателем.
-            </div>
-<?php endif; ?>
         </div>
     </div>
 </main>
 </body>
 </html>
-

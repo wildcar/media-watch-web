@@ -24,6 +24,7 @@ function app_config(): array
         'media_roots' => app_parse_media_roots(getenv('MEDIA_WATCH_MEDIA_ROOTS') ?: ''),
         'site_name' => getenv('MEDIA_WATCH_SITE_NAME') ?: 'Media Watch',
         'api_token' => getenv('MEDIA_WATCH_API_TOKEN') ?: '',
+        'share_dir' => getenv('MEDIA_WATCH_SHARE_DIR') ?: '/mnt/storage/Media/Video/Share',
     ];
 
     $localConfigPath = $root . '/config.local.php';
@@ -38,6 +39,7 @@ function app_config(): array
     $config['db_path'] = (string) $config['db_path'];
     $config['site_name'] = (string) $config['site_name'];
     $config['api_token'] = (string) ($config['api_token'] ?? '');
+    $config['share_dir'] = rtrim((string) ($config['share_dir'] ?? ''), DIRECTORY_SEPARATOR);
     $config['media_roots'] = app_normalize_media_roots($config['media_roots']);
 
     return $config;
@@ -51,7 +53,11 @@ function app_storage(): MediaWatchStorage
     }
 
     $config = app_config();
-    $storage = new MediaWatchStorage($config['db_path'], $config['media_roots']);
+    $storage = new MediaWatchStorage(
+        $config['db_path'],
+        $config['media_roots'],
+        $config['share_dir']
+    );
     return $storage;
 }
 
