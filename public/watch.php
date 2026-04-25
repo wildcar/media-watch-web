@@ -55,7 +55,19 @@ $siteName = (string) app_config()['site_name'];
     <meta property="og:image" content="<?= e($posterUrl) ?>">
 <?php endif; ?>
 
+    <meta property="og:video" content="<?= e($streamUrl) ?>">
+    <meta property="og:video:url" content="<?= e($streamUrl) ?>">
+    <meta property="og:video:secure_url" content="<?= e($streamUrl) ?>">
+<?php if ($mimeType !== ''): ?>
+    <meta property="og:video:type" content="<?= e($mimeType) ?>">
+<?php endif; ?>
+
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:player" content="<?= e($streamUrl) ?>">
+    <meta name="twitter:player:stream" content="<?= e($streamUrl) ?>">
+<?php if ($mimeType !== ''): ?>
+    <meta name="twitter:player:stream:content_type" content="<?= e($mimeType) ?>">
+<?php endif; ?>
 
     <style>
         :root {

@@ -7,6 +7,21 @@ starts.
 
 ## 2026-04-25
 
+### Emit og:video / twitter:player tags
+
+- Add `og:video`, `og:video:url`, `og:video:secure_url`, `og:video:type`
+  and the matching `twitter:player*` tags on the watch page, pointing
+  at `/stream/<id>`.
+- Emitted unconditionally for every record; clients (Telegram in
+  particular) decide whether to render an inline player based on the
+  declared content type. For containers Telegram can't play (mkv,
+  avi, …) it gracefully falls back to the existing image preview.
+- Width/height are deferred — see workspace-root `AGENTS-TODO.md`.
+
+---
+
+## 2026-04-25
+
 ### Replace bottom watch link with a download button
 
 - Replace the "Ссылка: <watch_url>" line at the bottom of the watch
