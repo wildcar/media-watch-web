@@ -54,21 +54,17 @@ if (!flock($lock, LOCK_EX | LOCK_NB)) {
 
 $storage->setRemuxRunning($id);
 
-$probe = $storage->probeVideo($sourcePath);
-$audioStrategy = $storage->audioStrategy($probe['audio_codecs']);
-
 $tmpPath = $sharePath . '.tmp';
 @unlink($tmpPath);
 
-$audioArgs = $audioStrategy === 'aac'
-    ? '-c:a aac -b:a 192k'
-    : '-c:a copy';
-
+// Always re-encode the first audio stream to stereo AAC. Multi-channel
+// (5.1) AAC and multi-track sources frequently render silent in the
+// HTML5 player. AAC encoding takes seconds even for a feature-length
+// file — not worth the headache of "copy when possible".
 $cmd = sprintf(
-    'ffmpeg -nostdin -y -i %s -map 0:v:0 -c:v copy -map 0:a %s '
-    . '-movflags +faststart -f mp4 %s 2>&1',
+    'ffmpeg -nostdin -y -i %s -map 0:v:0 -c:v copy -map 0:a:0 '
+    . '-c:a aac -b:a 192k -ac 2 -movflags +faststart -f mp4 %s 2>&1',
     escapeshellarg($sourcePath),
-    $audioArgs,
     escapeshellarg($tmpPath)
 );
 
