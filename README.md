@@ -66,6 +66,9 @@ Supported keys:
 - `MEDIA_WATCH_DB_PATH` — SQLite path, default `var/media_watch.sqlite`
 - `MEDIA_WATCH_MEDIA_ROOTS` — comma-separated allowlist of absolute media roots
 - `MEDIA_WATCH_SITE_NAME` — page title prefix, default `Media Watch`
+- `MEDIA_WATCH_API_TOKEN` — Bearer token for the registration HTTP API.
+  Empty/unset disables `POST /api/register` and `DELETE /api/records/{id}`
+  (they answer `503`).
 
 To override locally:
 
@@ -96,6 +99,84 @@ Delete a record:
 ```bash
 php bin/delete.php --id=tt1160419-2026-04-23
 ```
+
+## Registration HTTP API
+
+For automation (e.g. the Telegram bot orchestrator), the same registry is
+exposed over HTTP. Auth is a Bearer token — the API is disabled (`503`)
+until `api_token` / `MEDIA_WATCH_API_TOKEN` is set.
+
+### `POST /api/register`
+
+Register one or many records from either a single file or a directory.
+
+Request body (JSON):
+
+```json
+{
+  "path": "/mnt/storage/Media/Video/Movie/Dune (2021)",
+  "title": "Дюна",
+  "kind": "movie",
+  "imdb_id": "tt1160419",
+  "description": "Paul Atreides…",
+  "poster_url": "https://image.tmdb.org/t/p/w500/abc.jpg"
+}
+```
+
+Behaviour:
+
+- `path` is a **file** → registers exactly that file.
+- `path` is a **directory** + `kind=movie` → picks the largest video file
+  inside the directory, ignoring filenames containing `sample`.
+- `path` is a **directory** + `kind=series` → recursively scans for video
+  files, parses `S01E02` / `1x02` / `Season 1 Episode 2` from filenames
+  and registers one record per episode. Files that don't match are
+  reported as `warnings[]` and skipped.
+
+Auto-generated id:
+
+- base = `imdb_id` if it matches `tt\d{7,10}`, otherwise a slug from
+  `title`;
+- series episode → `<base>-sNNeMM`;
+- on collision with a **different** file, a numeric suffix is appended
+  (`-2`, `-3`, …); a re-register of the **same** path under the same id
+  is idempotent (upsert).
+
+Response (200):
+
+```json
+{
+  "records": [
+    {
+      "id": "tt1160419",
+      "title": "Дюна",
+      "kind": "movie",
+      "file_path": "/mnt/.../Dune.mkv",
+      "season": null,
+      "episode": null,
+      "watch_url": "https://v.sitename.org/watch/tt1160419",
+      "stream_url": "https://v.sitename.org/stream/tt1160419"
+    }
+  ],
+  "warnings": []
+}
+```
+
+Common error codes: `401 unauthorized`, `400 invalid_argument`,
+`400 invalid_json`, `400 no_records`, `503 api_disabled`.
+
+Example call:
+
+```bash
+curl -sS -X POST https://v.sitename.org/api/register \
+  -H "Authorization: Bearer $MEDIA_WATCH_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"path":"/mnt/.../Dune (2021)","title":"Дюна","kind":"movie","imdb_id":"tt1160419"}'
+```
+
+### `DELETE /api/records/{id}`
+
+Removes a single record. Returns `{ "id", "deleted": true|false }`.
 
 ## Local Development
 

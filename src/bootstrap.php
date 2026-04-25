@@ -23,6 +23,7 @@ function app_config(): array
         'db_path' => getenv('MEDIA_WATCH_DB_PATH') ?: $root . '/var/media_watch.sqlite',
         'media_roots' => app_parse_media_roots(getenv('MEDIA_WATCH_MEDIA_ROOTS') ?: ''),
         'site_name' => getenv('MEDIA_WATCH_SITE_NAME') ?: 'Media Watch',
+        'api_token' => getenv('MEDIA_WATCH_API_TOKEN') ?: '',
     ];
 
     $localConfigPath = $root . '/config.local.php';
@@ -36,6 +37,7 @@ function app_config(): array
     $config['base_url'] = rtrim((string) $config['base_url'], '/');
     $config['db_path'] = (string) $config['db_path'];
     $config['site_name'] = (string) $config['site_name'];
+    $config['api_token'] = (string) ($config['api_token'] ?? '');
     $config['media_roots'] = app_normalize_media_roots($config['media_roots']);
 
     return $config;

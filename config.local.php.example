@@ -10,5 +10,11 @@ return [
         '/mnt/storage/Media/Video/Series',
     ],
     'site_name' => 'Media Watch',
+
+    // Bearer token for the registration HTTP API (POST /api/register,
+    // DELETE /api/records/{id}). Generate a long random string, e.g.
+    //   php -r "echo bin2hex(random_bytes(32)), \"\n\";"
+    // Leave empty to disable the API entirely (returns 503).
+    'api_token' => '',
 ];
 
