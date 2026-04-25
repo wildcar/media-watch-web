@@ -47,7 +47,7 @@ $siteName = (string) app_config()['site_name'];
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($title) ?> · <?= e($siteName) ?></title>
     <meta name="description" content="<?= e($description) ?>">
-    <meta name="robots" content="noindex,nofollow">
+    <meta name="robots" content="noindex">
 
     <meta property="og:title" content="<?= e($title) ?>">
     <meta property="og:description" content="<?= e($description) ?>">
