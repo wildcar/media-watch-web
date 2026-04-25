@@ -7,6 +7,28 @@ starts.
 
 ## 2026-04-25
 
+### ffprobe video dimensions for og:video:width/height
+
+- Telegram refuses to render an inline player from `og:video` alone —
+  it needs `og:video:width` and `og:video:height` declared on the
+  watch page. Without them clients fall back to "just a link", which
+  is exactly what we observed on `https://v.wildcar.ru/watch/tt26443597`
+  even after `@WebpageBot` cache refresh.
+- On register: run `ffprobe -v error -select_streams v:0 -show_entries
+  stream=width,height -show_entries format=duration` against the
+  resolved file. Persist `video_width`, `video_height`,
+  `duration_seconds` columns. ffprobe failures are non-fatal — we just
+  store zeros and skip emitting the tags.
+- `watch.php` now emits `og:video:width`/`og:video:height` (and a
+  matching `twitter:player:width`/`height`) when the columns are
+  populated.
+- `bin/backfill-dimensions.php` walks existing rows with `width=0`
+  and probes them in-place.
+
+---
+
+## 2026-04-25
+
 ### Emit og:video / twitter:player tags
 
 - Add `og:video`, `og:video:url`, `og:video:secure_url`, `og:video:type`

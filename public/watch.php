@@ -28,6 +28,8 @@ if ($description === '') {
 
 $posterUrl = trim((string) ($record['poster_url'] ?? ''));
 $mimeType = trim((string) ($record['mime_type'] ?? ''));
+$videoWidth = (int) ($record['video_width'] ?? 0);
+$videoHeight = (int) ($record['video_height'] ?? 0);
 $watchUrl = full_url('/watch/' . rawurlencode($id));
 $streamUrl = full_url('/stream/' . rawurlencode($id));
 $downloadUrl = $streamUrl . '?download=1';
@@ -61,12 +63,20 @@ $siteName = (string) app_config()['site_name'];
 <?php if ($mimeType !== ''): ?>
     <meta property="og:video:type" content="<?= e($mimeType) ?>">
 <?php endif; ?>
+<?php if ($videoWidth > 0 && $videoHeight > 0): ?>
+    <meta property="og:video:width" content="<?= $videoWidth ?>">
+    <meta property="og:video:height" content="<?= $videoHeight ?>">
+<?php endif; ?>
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:player" content="<?= e($streamUrl) ?>">
     <meta name="twitter:player:stream" content="<?= e($streamUrl) ?>">
 <?php if ($mimeType !== ''): ?>
     <meta name="twitter:player:stream:content_type" content="<?= e($mimeType) ?>">
+<?php endif; ?>
+<?php if ($videoWidth > 0 && $videoHeight > 0): ?>
+    <meta name="twitter:player:width" content="<?= $videoWidth ?>">
+    <meta name="twitter:player:height" content="<?= $videoHeight ?>">
 <?php endif; ?>
 
     <style>

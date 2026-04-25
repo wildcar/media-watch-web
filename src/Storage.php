@@ -56,12 +56,18 @@ final class MediaWatchStorage
             $mimeType = $this->detectMimeType($resolvedPath);
         }
 
+        $probe = $this->probeVideo($resolvedPath);
+
         $now = gmdate('c');
         $stmt = $this->pdo->prepare(
             'INSERT INTO records (
-                id, file_path, title, description, poster_url, mime_type, kind, created_at, updated_at
+                id, file_path, title, description, poster_url, mime_type, kind,
+                video_width, video_height, duration_seconds,
+                created_at, updated_at
             ) VALUES (
-                :id, :file_path, :title, :description, :poster_url, :mime_type, :kind, :created_at, :updated_at
+                :id, :file_path, :title, :description, :poster_url, :mime_type, :kind,
+                :video_width, :video_height, :duration_seconds,
+                :created_at, :updated_at
             )
             ON CONFLICT(id) DO UPDATE SET
                 file_path = excluded.file_path,
@@ -70,6 +76,9 @@ final class MediaWatchStorage
                 poster_url = excluded.poster_url,
                 mime_type = excluded.mime_type,
                 kind = excluded.kind,
+                video_width = excluded.video_width,
+                video_height = excluded.video_height,
+                duration_seconds = excluded.duration_seconds,
                 updated_at = excluded.updated_at'
         );
 
@@ -81,6 +90,9 @@ final class MediaWatchStorage
             ':poster_url' => trim((string) ($record['poster_url'] ?? '')),
             ':mime_type' => $mimeType,
             ':kind' => $kind,
+            ':video_width' => $probe['width'],
+            ':video_height' => $probe['height'],
+            ':duration_seconds' => $probe['duration'],
             ':created_at' => $now,
             ':updated_at' => $now,
         ]);
@@ -110,10 +122,90 @@ final class MediaWatchStorage
                 poster_url TEXT NOT NULL DEFAULT "",
                 mime_type TEXT NOT NULL DEFAULT "application/octet-stream",
                 kind TEXT NOT NULL DEFAULT "movie",
+                video_width INTEGER NOT NULL DEFAULT 0,
+                video_height INTEGER NOT NULL DEFAULT 0,
+                duration_seconds INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )'
         );
+
+        // Idempotent migrations for older deploys that pre-date the
+        // dimension columns. SQLite has no IF NOT EXISTS for ADD COLUMN,
+        // so we probe table_info first.
+        $columns = [];
+        foreach ($this->pdo->query('PRAGMA table_info(records)') as $row) {
+            $columns[(string) $row['name']] = true;
+        }
+        if (!isset($columns['video_width'])) {
+            $this->pdo->exec('ALTER TABLE records ADD COLUMN video_width INTEGER NOT NULL DEFAULT 0');
+        }
+        if (!isset($columns['video_height'])) {
+            $this->pdo->exec('ALTER TABLE records ADD COLUMN video_height INTEGER NOT NULL DEFAULT 0');
+        }
+        if (!isset($columns['duration_seconds'])) {
+            $this->pdo->exec('ALTER TABLE records ADD COLUMN duration_seconds INTEGER NOT NULL DEFAULT 0');
+        }
+    }
+
+    /**
+     * Run ffprobe against a video file and pull width / height /
+     * duration. Failures (missing binary, broken file, timeout) are
+     * non-fatal — we just return zeros so the caller can still store
+     * the record.
+     *
+     * @return array{width:int,height:int,duration:int}
+     */
+    public function probeVideo(string $path): array
+    {
+        $cmd = sprintf(
+            'ffprobe -v error -of json -select_streams v:0 '
+            . '-show_entries stream=width,height -show_entries format=duration %s 2>/dev/null',
+            escapeshellarg($path)
+        );
+        $output = @shell_exec($cmd);
+        if (!is_string($output) || $output === '') {
+            return ['width' => 0, 'height' => 0, 'duration' => 0];
+        }
+        $decoded = json_decode($output, true);
+        if (!is_array($decoded)) {
+            return ['width' => 0, 'height' => 0, 'duration' => 0];
+        }
+        $stream = $decoded['streams'][0] ?? [];
+        $duration = (float) ($decoded['format']['duration'] ?? 0);
+        return [
+            'width' => (int) ($stream['width'] ?? 0),
+            'height' => (int) ($stream['height'] ?? 0),
+            'duration' => (int) round($duration),
+        ];
+    }
+
+    public function setProbe(string $id, int $width, int $height, int $duration): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE records
+                SET video_width = :w, video_height = :h, duration_seconds = :d, updated_at = :u
+              WHERE id = :id'
+        );
+        $stmt->execute([
+            ':w' => $width,
+            ':h' => $height,
+            ':d' => $duration,
+            ':u' => gmdate('c'),
+            ':id' => $id,
+        ]);
+    }
+
+    /**
+     * @return list<array{id:string,file_path:string}>
+     */
+    public function listMissingDimensions(): array
+    {
+        $out = [];
+        foreach ($this->pdo->query('SELECT id, file_path FROM records WHERE video_width = 0 OR video_height = 0') as $row) {
+            $out[] = ['id' => (string) $row['id'], 'file_path' => (string) $row['file_path']];
+        }
+        return $out;
     }
 
     private function assertAllowedFile(string $path): string
@@ -165,6 +257,9 @@ final class MediaWatchStorage
             'poster_url' => (string) ($row['poster_url'] ?? ''),
             'mime_type' => (string) ($row['mime_type'] ?? 'application/octet-stream'),
             'kind' => (string) ($row['kind'] ?? 'movie'),
+            'video_width' => (int) ($row['video_width'] ?? 0),
+            'video_height' => (int) ($row['video_height'] ?? 0),
+            'duration_seconds' => (int) ($row['duration_seconds'] ?? 0),
             'created_at' => (string) ($row['created_at'] ?? ''),
             'updated_at' => (string) ($row['updated_at'] ?? ''),
         ];
