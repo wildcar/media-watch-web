@@ -49,4 +49,5 @@ MediaWatchStreamer::send(
     $mimeType,
     (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'),
     $asAttachment,
+    !empty(app_config()['use_xsendfile']),
 );

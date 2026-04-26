@@ -16,5 +16,11 @@ return [
     //   php -r "echo bin2hex(random_bytes(32)), \"\n\";"
     // Leave empty to disable the API entirely (returns 503).
     'api_token' => '',
+
+    // Hand file streaming to Apache via X-Sendfile so downloads carry
+    // a proper Content-Length (browsers show ETA / remaining bytes).
+    // Requires libapache2-mod-xsendfile + an XSendFilePath whitelist;
+    // see env.md for the full setup.
+    'use_xsendfile' => false,
 ];
 

@@ -9,6 +9,7 @@ final class MediaWatchStreamer
         string $mimeType,
         string $method = 'GET',
         bool $asAttachment = false,
+        bool $useXSendfile = false,
     ): void {
         if (!is_readable($path) || !is_file($path)) {
             http_response_code(404);
@@ -22,6 +23,24 @@ final class MediaWatchStreamer
             http_response_code(500);
             header('Content-Type: text/plain; charset=UTF-8');
             echo 'Failed to determine file size';
+            return;
+        }
+
+        // X-Sendfile path: hand the file off to Apache (mod_xsendfile)
+        // so the response carries a real Content-Length. PHP-FPM streaming
+        // ends up Transfer-Encoding: chunked, which kills download-progress
+        // UI in browsers. Only the headers that *aren't* about the body
+        // size are set here — Apache fills in Content-Length / Range.
+        if ($useXSendfile) {
+            header_remove('X-Powered-By');
+            header('Content-Type: ' . ($mimeType !== '' ? $mimeType : 'application/octet-stream'));
+            $disposition = $asAttachment ? 'attachment' : 'inline';
+            header(
+                'Content-Disposition: ' . $disposition
+                . '; filename="' . addslashes(basename($path)) . '"'
+            );
+            header('Cache-Control: private, max-age=0, must-revalidate');
+            header('X-Sendfile: ' . $path);
             return;
         }
 

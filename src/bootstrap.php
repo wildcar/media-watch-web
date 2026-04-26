@@ -25,6 +25,16 @@ function app_config(): array
         'site_name' => getenv('MEDIA_WATCH_SITE_NAME') ?: 'Media Watch',
         'api_token' => getenv('MEDIA_WATCH_API_TOKEN') ?: '',
         'share_dir' => getenv('MEDIA_WATCH_SHARE_DIR') ?: '/mnt/storage/Media/Video/Share',
+        // When true, the streamer hands file delivery to Apache via the
+        // X-Sendfile header instead of streaming bytes through PHP. This
+        // is the only way the browser sees a real Content-Length: PHP-FPM
+        // forces Transfer-Encoding: chunked otherwise, and the download
+        // dialog shows no progress / no ETA. Requires mod_xsendfile on
+        // the host (see env.md for install steps).
+        'use_xsendfile' => filter_var(
+            getenv('MEDIA_WATCH_USE_XSENDFILE') ?: '',
+            FILTER_VALIDATE_BOOLEAN
+        ),
     ];
 
     $localConfigPath = $root . '/config.local.php';

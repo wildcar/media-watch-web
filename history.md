@@ -7,6 +7,38 @@ starts.
 
 ## 2026-04-26
 
+### `X-Sendfile` for download progress
+
+**Why.** PHP-FPM streams the file body through `fread`+`echo`+`flush`,
+which Apache wraps in `Transfer-Encoding: chunked` — that strips
+`Content-Length` from the response and the browser's download dialog
+shows neither remaining bytes nor ETA. (Confirmed via
+`curl -I -H 'Range: bytes=0-1' /stream/<id>?download=1`: 206 with
+`Transfer-Encoding: chunked` and no `Content-Length`.)
+
+**What.** New optional code path in `MediaWatchStreamer::send` (gated
+by config `use_xsendfile` / env `MEDIA_WATCH_USE_XSENDFILE=1`): when
+on, PHP only sets headers and emits `X-Sendfile: <path>`. Apache
+(`mod_xsendfile`) takes over, `sendfile(2)`s the bytes, and emits a
+real `Content-Length`. Range requests still work — Apache handles
+them too. Default off so an existing deploy keeps working until the
+operator installs `mod_xsendfile`.
+
+**Deploy.**
+- `apt install libapache2-mod-xsendfile && a2enmod xsendfile`
+- Add `XSendFile On` + `XSendFilePath /mnt/storage/Media` to the vhost
+  (without the path whitelist Apache 403s the request).
+- Set `MEDIA_WATCH_USE_XSENDFILE=1` in the service env.
+- Reload Apache.
+- Verify with `curl -sI -H 'Range: bytes=0-1' …` — response should
+  carry `Content-Length: <total>` and **no** `Transfer-Encoding`.
+
+Step-by-step recipe is in `env.md`.
+
+---
+
+## 2026-04-26
+
 ### `/api/register` — composite media_id contract
 
 **Why.** Cross-repo move to a typed media-id (`<source>-<id>`) so
