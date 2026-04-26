@@ -7,6 +7,34 @@ starts.
 
 ## 2026-04-26
 
+### Register: season-in-dir + raw-numbered filename fallback
+
+**Why.** First series registration in production failed for «Друзья
+(1994)» — every episode skipped with «no SxxEyy marker». rutracker
+upload had season buried in the directory name (`Сезон 9/`) and
+files numbered raw (`01. The One Where….mkv`), so the existing
+`EPISODE_PATTERNS` (filename-only) never matched.
+
+**What.** New `parseEpisodeFromPath` fallback in `Api.php`:
+- Pulls episode from a leading `\d{1,3}` in the basename, optionally
+  followed by a range partner (`23-24. The One in Barbados.mkv` →
+  episode 23 — range collapses to the first number; the alt is
+  losing the file entirely).
+- Walks the directory chain from the file up to (and including)
+  the registration root, picking the deepest folder name that
+  matches `(сезон|season|s)\s*\d{1,2}` — handles
+  `Друзья (1994)/Сезон 9/01.mkv`, `Show/S09/01.mkv`,
+  `Show/Season 9/01.mkv`. Existing `parseEpisode` keeps priority,
+  so series-style filenames (`S01E01`) still win.
+
+**Tests.** `api_smoke.php` extended with a Russian-style season
+fixture (3 files, including a 23-24 double-episode); asserts all
+three register as season 9 episodes 1/2/23.
+
+---
+
+## 2026-04-26
+
 ### `X-Sendfile` for download progress
 
 **Why.** PHP-FPM streams the file body through `fread`+`echo`+`flush`,

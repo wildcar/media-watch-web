@@ -38,6 +38,23 @@ final class MediaWatchApi
         '/season[\s_\-]?(\d{1,2}).{0,12}episode[\s_\-]?(\d{1,3})/i',
     ];
 
+    /** Season-from-folder fallback: rutracker uploads commonly bury the
+     *  season in the directory name («Сезон 9», «Season 9», «S09»…) and
+     *  number episodes raw inside the folder («01. The One Where…mkv»).
+     *  Matched against any directory component between the root path and
+     *  the file. */
+    private const SEASON_DIR_PATTERN =
+        '/(?:^|[\s_\-])(?:сезон|season|s)\s*[\-_]?\s*(\d{1,2})(?:[\s_\-]|$)/iu';
+
+    /** Episode-from-filename fallback when no SxxEyy marker is present:
+     *  matches a leading number, optionally followed by a range partner
+     *  (`23-24. The One in Barbados.mkv`). Range markers compress to the
+     *  first episode — picking 23 here means a 23-24 double-episode loses
+     *  its dedicated S09E24 link, but it's still reachable from the S09E23
+     *  watch page; the alternative (skip the file) is worse. */
+    private const EPISODE_FILE_PATTERN =
+        '/^\s*(\d{1,3})(?:\s*[-–]\s*\d{1,3})?[.\s_\-]/u';
+
     /** @param array<string,mixed> $config */
     public function __construct(
         private MediaWatchStorage $storage,
@@ -242,7 +259,8 @@ final class MediaWatchApi
 
         $out = [];
         foreach ($files as $f) {
-            $parsed = $this->parseEpisode(basename($f['path']));
+            $parsed = $this->parseEpisode(basename($f['path']))
+                ?? $this->parseEpisodeFromPath($directory, $f['path']);
             if ($parsed === null) {
                 $out[] = ['warning' => sprintf('skipped: %s (no SxxEyy marker)', basename($f['path']))];
                 continue;
@@ -250,6 +268,47 @@ final class MediaWatchApi
             $out[] = ['file' => $f['path'], 'season' => $parsed[0], 'episode' => $parsed[1]];
         }
         return $out;
+    }
+
+    /**
+     * Fallback episode parser for releases that bury the season in a
+     * directory name («Сезон 9 / 01. The One Where….mkv») and number
+     * episodes raw in the filename. Walks parent directories from the
+     * file up to (but not including) the registration root, picking the
+     * deepest matching season — that way nested layouts like
+     * `Druzya/Сезон 9/01.mkv` find season 9, not the parent's «Friends».
+     *
+     * @return array{0:int,1:int}|null
+     */
+    private function parseEpisodeFromPath(string $rootDir, string $filePath): ?array
+    {
+        $epMatch = preg_match(self::EPISODE_FILE_PATTERN, basename($filePath), $em);
+        if ($epMatch !== 1) {
+            return null;
+        }
+        $episode = (int) $em[1];
+        if ($episode <= 0) {
+            return null;
+        }
+
+        $rel = ltrim(substr($filePath, strlen($rootDir)), DIRECTORY_SEPARATOR);
+        $parts = explode(DIRECTORY_SEPARATOR, $rel);
+        array_pop($parts); // drop filename, leaving the chain *under* rootDir
+        // Walk inwards-out: deepest dir first, then rootDir itself. The
+        // bot often passes a season-named directory directly as the root
+        // (e.g. `…/Друзья (1994)/Сезон 9`), so we have to consider its
+        // basename too — otherwise that case never matches.
+        $candidates = array_reverse($parts);
+        $candidates[] = basename($rootDir);
+        foreach ($candidates as $candidate) {
+            if (preg_match(self::SEASON_DIR_PATTERN, $candidate, $m) === 1) {
+                $season = (int) $m[1];
+                if ($season > 0 && $season <= 99) {
+                    return [$season, $episode];
+                }
+            }
+        }
+        return null;
     }
 
     /**

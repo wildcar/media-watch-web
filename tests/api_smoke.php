@@ -24,6 +24,7 @@ $mediaRoot = $tmp . '/media';
 $dbPath = $tmp . '/db.sqlite';
 mkdir($mediaRoot . '/Movie/Sample.Movie.2024.1080p', 0777, true);
 mkdir($mediaRoot . '/Series/Show.S01.1080p', 0777, true);
+mkdir($mediaRoot . '/Series/Друзья (1994)/Сезон 9', 0777, true);
 
 // Two video files in a movie dir + one sample → bigger non-sample wins.
 file_put_contents($mediaRoot . '/Movie/Sample.Movie.2024.1080p/Sample.Movie.2024.mkv', str_repeat('A', 4096));
@@ -34,12 +35,17 @@ file_put_contents($mediaRoot . '/Movie/Standalone.mp4', str_repeat('C', 1024));
 file_put_contents($mediaRoot . '/Series/Show.S01.1080p/Show.S01E01.1080p.mkv', str_repeat('D', 1024));
 file_put_contents($mediaRoot . '/Series/Show.S01.1080p/Show.1x02.WEBRip.mkv', str_repeat('E', 1024));
 file_put_contents($mediaRoot . '/Series/Show.S01.1080p/extras.mkv', str_repeat('F', 1024));
+// Russian-style layout: season in the directory name, episodes numbered
+// raw in the filename. Single + range double-episode filenames.
+file_put_contents($mediaRoot . '/Series/Друзья (1994)/Сезон 9/01. The One Where No One Proposes.mkv', str_repeat('G', 1024));
+file_put_contents($mediaRoot . '/Series/Друзья (1994)/Сезон 9/02. The One Where Emma Cries.mkv', str_repeat('H', 1024));
+file_put_contents($mediaRoot . '/Series/Друзья (1994)/Сезон 9/23-24. The One in Barbados.mkv', str_repeat('I', 1024));
 
 $env = [
     'PATH' => getenv('PATH'),
     'MEDIA_WATCH_BASE_URL' => 'http://127.0.0.1:' . PORT,
     'MEDIA_WATCH_DB_PATH' => $dbPath,
-    'MEDIA_WATCH_MEDIA_ROOTS' => $mediaRoot . '/Movie,' . $mediaRoot . '/Series',
+    'MEDIA_WATCH_MEDIA_ROOTS' => $mediaRoot . '/Movie,' . $mediaRoot . '/Series,' . $mediaRoot . '/Series/Друзья (1994)',
     'MEDIA_WATCH_SITE_NAME' => 'Smoke',
     'MEDIA_WATCH_API_TOKEN' => TOKEN,
 ];
@@ -194,7 +200,22 @@ assert_eq(400, $code, 'missing media_id → 400');
 ], TOKEN);
 assert_eq(400, $code, 'bare imdb id (no prefix) → 400');
 
-// 11) DELETE.
+// 11) Russian raw-numbered layout: season in directory name, plain
+//     episode-number filenames. The double-episode range collapses to
+//     its first number.
+[$code, $body] = call('POST', '/api/register', [
+    'path' => $mediaRoot . '/Series/Друзья (1994)/Сезон 9',
+    'title' => 'Друзья',
+    'kind' => 'series',
+    'media_id' => 'rt-12345',
+], TOKEN);
+assert_eq(200, $code, 'season-in-dir + raw filenames → 200');
+assert_eq(3, count($body['records']), 'three episodes registered (incl. 23-24 double)');
+$episodes = array_map(static fn($r) => [(int) $r['season'], (int) $r['episode']], $body['records']);
+sort($episodes);
+assert_eq([[9, 1], [9, 2], [9, 23]], $episodes, 'season 9 episodes 1, 2, 23 (range → first)');
+
+// 12) DELETE.
 [$code, $body] = call('DELETE', '/api/records/rt-6843582', null, TOKEN);
 assert_eq(200, $code, 'delete returns 200');
 assert_eq(true, $body['deleted'], 'deleted=true');
