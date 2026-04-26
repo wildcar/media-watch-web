@@ -111,60 +111,61 @@ assert_eq(401, $code, 'no auth → 401');
 [$code, $body] = call('POST', '/api/register', ['path' => $mediaRoot . '/Movie/Standalone.mp4', 'title' => 'X', 'kind' => 'movie'], 'wrong');
 assert_eq(401, $code, 'wrong token → 401');
 
-// 3) Movie via single file.
+// 3) Movie via single file (rt- prefix — typical rutracker download).
 [$code, $body] = call('POST', '/api/register', [
     'path' => $mediaRoot . '/Movie/Standalone.mp4',
     'title' => 'Standalone',
     'kind' => 'movie',
-    'imdb_id' => 'tt1234567',
+    'media_id' => 'rt-6843582',
 ], TOKEN);
 assert_eq(200, $code, 'single-file movie → 200');
 assert_eq(1, count($body['records']), 'single-file movie produces one record');
-assert_eq('tt1234567', $body['records'][0]['id'], 'movie id = imdb');
+assert_eq('rt-6843582', $body['records'][0]['id'], 'movie id = media_id');
 assert_eq(true, str_starts_with($body['records'][0]['watch_url'], 'http://127.0.0.1:' . PORT . '/watch/'), 'watch_url uses base_url');
 
-// 4) Movie via directory — bigger non-sample file should win.
+// 4) Movie via directory (imdb- prefix — bot fell back to bare IMDb id).
 [$code, $body] = call('POST', '/api/register', [
     'path' => $mediaRoot . '/Movie/Sample.Movie.2024.1080p',
     'title' => 'Sample Movie',
     'kind' => 'movie',
-    'imdb_id' => 'tt7654321',
+    'media_id' => 'imdb-tt7654321',
 ], TOKEN);
 assert_eq(200, $code, 'directory movie → 200');
 assert_eq(1, count($body['records']), 'directory movie produces one record');
 assert_eq('Sample.Movie.2024.mkv', basename($body['records'][0]['file_path']), 'sample file is skipped');
+assert_eq('imdb-tt7654321', $body['records'][0]['id'], 'imdb-prefixed media_id round-trips');
 
 // 5) Re-register same path same id → idempotent (no suffix).
 [$code, $body] = call('POST', '/api/register', [
     'path' => $mediaRoot . '/Movie/Standalone.mp4',
     'title' => 'Standalone',
     'kind' => 'movie',
-    'imdb_id' => 'tt1234567',
+    'media_id' => 'rt-6843582',
 ], TOKEN);
-assert_eq('tt1234567', $body['records'][0]['id'], 're-register same path keeps id');
+assert_eq('rt-6843582', $body['records'][0]['id'], 're-register same path keeps id');
 
-// 6) Different path, same imdb → suffix -2.
+// 6) Different path, same media_id → suffix -2.
 copy($mediaRoot . '/Movie/Standalone.mp4', $mediaRoot . '/Movie/Standalone.alt.mp4');
 [$code, $body] = call('POST', '/api/register', [
     'path' => $mediaRoot . '/Movie/Standalone.alt.mp4',
     'title' => 'Standalone',
     'kind' => 'movie',
-    'imdb_id' => 'tt1234567',
+    'media_id' => 'rt-6843582',
 ], TOKEN);
-assert_eq('tt1234567-2', $body['records'][0]['id'], 'collision adds -2 suffix');
+assert_eq('rt-6843582-2', $body['records'][0]['id'], 'collision adds -2 suffix');
 
 // 7) Series directory.
 [$code, $body] = call('POST', '/api/register', [
     'path' => $mediaRoot . '/Series/Show.S01.1080p',
     'title' => 'Show',
     'kind' => 'series',
-    'imdb_id' => 'tt9999999',
+    'media_id' => 'rt-9999999',
 ], TOKEN);
 assert_eq(200, $code, 'series directory → 200');
 assert_eq(2, count($body['records']), 'series produces 2 episodes');
 $ids = array_map(static fn($r) => $r['id'], $body['records']);
 sort($ids);
-assert_eq(['tt9999999-s01e01', 'tt9999999-s01e02'], $ids, 'episode ids');
+assert_eq(['rt-9999999-s01e01', 'rt-9999999-s01e02'], $ids, 'episode ids');
 assert_eq(true, !empty($body['warnings']), 'extras.mkv is reported as warning');
 
 // 8) Path outside media_roots → 400.
@@ -172,15 +173,33 @@ assert_eq(true, !empty($body['warnings']), 'extras.mkv is reported as warning');
     'path' => '/etc/hostname',
     'title' => 'evil',
     'kind' => 'movie',
+    'media_id' => 'rt-1',
 ], TOKEN);
 assert_eq(400, $code, 'path outside media_roots → 400');
 
-// 9) DELETE.
-[$code, $body] = call('DELETE', '/api/records/tt1234567', null, TOKEN);
+// 9) Missing media_id → 400.
+[$code, $body] = call('POST', '/api/register', [
+    'path' => $mediaRoot . '/Movie/Standalone.mp4',
+    'title' => 'Standalone',
+    'kind' => 'movie',
+], TOKEN);
+assert_eq(400, $code, 'missing media_id → 400');
+
+// 10) Malformed media_id → 400.
+[$code, $body] = call('POST', '/api/register', [
+    'path' => $mediaRoot . '/Movie/Standalone.mp4',
+    'title' => 'Standalone',
+    'kind' => 'movie',
+    'media_id' => 'tt1234567',
+], TOKEN);
+assert_eq(400, $code, 'bare imdb id (no prefix) → 400');
+
+// 11) DELETE.
+[$code, $body] = call('DELETE', '/api/records/rt-6843582', null, TOKEN);
 assert_eq(200, $code, 'delete returns 200');
 assert_eq(true, $body['deleted'], 'deleted=true');
 
-[$code, $body] = call('DELETE', '/api/records/tt1234567', null, TOKEN);
+[$code, $body] = call('DELETE', '/api/records/rt-6843582', null, TOKEN);
 assert_eq(404, $code, 'second delete returns 404');
 
 echo "all good\n";

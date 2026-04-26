@@ -20,6 +20,17 @@ final class MediaWatchApi
         'ts', 'm2ts', 'mpg', 'mpeg', 'wmv', 'flv',
     ];
 
+    /**
+     * Composite media id format: `<source>-<id>`. The bot is the source
+     * of truth — it picks the prefix at registration time so different
+     * release sources of the same movie don't collide on a single PK.
+     *
+     *   imdb-tt1234567   — IMDb-only references (rare; bot prefers rt- when there's a torrent)
+     *   rt-6843582       — rutracker topic id (default for any rutracker download)
+     *   yt-dQw4w9WgXcQ   — YouTube video id (reserved; YouTube flow not implemented yet)
+     */
+    private const MEDIA_ID_REGEX = '/^(imdb-tt\d{7,10}|rt-\d+|yt-[A-Za-z0-9_-]{6,32})$/';
+
     /** Tried in order; first hit wins. Capture order: season, episode. */
     private const EPISODE_PATTERNS = [
         '/(?:^|[._\-\s\[(])s(\d{1,2})\s*[\.\s_\-]?\s*e(\d{1,3})(?:[\.\s_\-\])]|$)/i',
@@ -95,13 +106,20 @@ final class MediaWatchApi
         $path = trim((string) ($body['path'] ?? ''));
         $title = trim((string) ($body['title'] ?? ''));
         $kind = ($body['kind'] ?? 'movie') === 'series' ? 'series' : 'movie';
-        $imdbId = trim((string) ($body['imdb_id'] ?? ''));
+        $mediaId = trim((string) ($body['media_id'] ?? ''));
         $description = trim((string) ($body['description'] ?? ''));
         $posterUrl = trim((string) ($body['poster_url'] ?? ''));
         $mimeType = trim((string) ($body['mime_type'] ?? ''));
 
-        if ($path === '' || $title === '') {
-            $this->respond(400, ['error' => 'invalid_argument', 'message' => '`path` and `title` are required']);
+        if ($path === '' || $title === '' || $mediaId === '') {
+            $this->respond(400, ['error' => 'invalid_argument', 'message' => '`path`, `title` and `media_id` are required']);
+            return;
+        }
+        if (preg_match(self::MEDIA_ID_REGEX, $mediaId) !== 1) {
+            $this->respond(400, [
+                'error' => 'invalid_argument',
+                'message' => '`media_id` must match <source>-<id> with source in {imdb,rt,yt}',
+            ]);
             return;
         }
 
@@ -122,7 +140,7 @@ final class MediaWatchApi
 
         $warnings = [];
         $records = [];
-        $baseId = $this->makeBaseId($imdbId, $title);
+        $baseId = $mediaId;
 
         foreach ($files as $entry) {
             if (isset($entry['warning'])) {
@@ -319,29 +337,6 @@ final class MediaWatchApi
             }
         }
         return null;
-    }
-
-    private function makeBaseId(string $imdbId, string $title): string
-    {
-        if ($imdbId !== '' && preg_match('/^tt\d{7,10}$/i', $imdbId) === 1) {
-            return strtolower($imdbId);
-        }
-        $slug = $this->slugify($title);
-        return $slug !== '' ? $slug : 'untitled';
-    }
-
-    private function slugify(string $text): string
-    {
-        $text = strtolower($text);
-        if (function_exists('iconv')) {
-            $tr = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
-            if (is_string($tr) && $tr !== '') {
-                $text = $tr;
-            }
-        }
-        $text = (string) preg_replace('/[^a-z0-9]+/i', '-', $text);
-        $text = trim($text, '-');
-        return strtolower($text);
     }
 
     private function allocateId(string $candidate, string $newPath): string

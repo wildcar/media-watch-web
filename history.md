@@ -5,6 +5,37 @@ starts.
 
 ---
 
+## 2026-04-26
+
+### `/api/register` — composite media_id contract
+
+**Why.** Cross-repo move to a typed media-id (`<source>-<id>`) so
+different rutracker releases of the same film no longer collide on a
+single PK, and so future YouTube records get a slot without overloading
+the old `tt…` shape. See `AGENTS-SUMMARY.md` for the full pipeline.
+
+**What changed.**
+- `POST /api/register` body field `imdb_id` → `media_id`. Now required
+  and validated against `^(imdb-tt\d{7,10}|rt-\d+|yt-[A-Za-z0-9_-]{6,32})$`.
+- Series episode ids: `<media_id>-s01e01` (separator unchanged; the
+  collision-suffix logic still works as before).
+- Dropped `Api::makeBaseId` and `Api::slugify` — the bot is the source
+  of truth for the id, no server-side derivation.
+- Storage schema unchanged: `id TEXT PK` was already format-agnostic.
+- `bin/wipe-records.php` (new): one-shot post-deploy cleanup, since
+  existing rows under the old `tt…` keys are abandoned (no migration —
+  bot re-registers on the next download).
+
+**Deploy notes.**
+1. Roll out `media-watch-web` first.
+2. SSH the media host and run `php bin/wipe-records.php --yes` to
+   clear the old rows.
+3. Then roll out `movie-handler-clients` (PR #3) which sends
+   `media_id`. Bot deploys before the wipe will register against the
+   old format and 400 — keep ordering tight.
+
+---
+
 ## 2026-04-25
 
 ### Watch page polish — description under the player, drop VLC hint
