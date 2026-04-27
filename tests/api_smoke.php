@@ -200,6 +200,19 @@ assert_eq(400, $code, 'missing media_id → 400');
 ], TOKEN);
 assert_eq(400, $code, 'bare imdb id (no prefix) → 400');
 
+// 11a) Cartoon kind: behaves like movie (single file from dir), but
+//     persists as kind=cartoon so the bot's /list shows the 🎨 marker
+//     and the dispatcher uses /Video/Cartoon/ on the rtorrent side.
+[$code, $body] = call('POST', '/api/register', [
+    'path' => $mediaRoot . '/Movie/Sample.Movie.2024.1080p',
+    'title' => 'Toy Story',
+    'kind' => 'cartoon',
+    'media_id' => 'rt-77777',
+], TOKEN);
+assert_eq(200, $code, 'cartoon → 200');
+assert_eq(1, count($body['records']), 'cartoon registers one record');
+assert_eq('cartoon', $body['records'][0]['kind'], 'cartoon kind round-trips');
+
 // 11) Russian raw-numbered layout: season in directory name, plain
 //     episode-number filenames. The double-episode range collapses to
 //     its first number.

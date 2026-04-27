@@ -122,7 +122,14 @@ final class MediaWatchApi
 
         $path = trim((string) ($body['path'] ?? ''));
         $title = trim((string) ($body['title'] ?? ''));
-        $kind = ($body['kind'] ?? 'movie') === 'series' ? 'series' : 'movie';
+        $kindRaw = (string) ($body['kind'] ?? 'movie');
+        // Series gets per-episode parsing; cartoon and movie share the
+        // single-file path. Anything else falls back to movie.
+        $kind = match ($kindRaw) {
+            'series' => 'series',
+            'cartoon' => 'cartoon',
+            default => 'movie',
+        };
         $mediaId = trim((string) ($body['media_id'] ?? ''));
         $description = trim((string) ($body['description'] ?? ''));
         $posterUrl = trim((string) ($body['poster_url'] ?? ''));
@@ -252,7 +259,10 @@ final class MediaWatchApi
             throw new RuntimeException('No video files found in ' . $directory);
         }
 
-        if ($kind === 'movie') {
+        // Cartoons share the movie codepath (single biggest file in the
+        // directory wins, no episode parsing). Series goes through the
+        // per-episode loop below.
+        if ($kind !== 'series') {
             usort($files, static fn(array $a, array $b): int => $b['size'] <=> $a['size']);
             return [['file' => $files[0]['path'], 'season' => null, 'episode' => null]];
         }

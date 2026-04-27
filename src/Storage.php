@@ -63,7 +63,12 @@ final class MediaWatchStorage
         }
 
         $resolvedPath = $this->assertAllowedFile($filePath);
-        $kind = ($record['kind'] ?? 'movie') === 'series' ? 'series' : 'movie';
+        $kindRaw = (string) ($record['kind'] ?? 'movie');
+        $kind = match ($kindRaw) {
+            'series' => 'series',
+            'cartoon' => 'cartoon',
+            default => 'movie',
+        };
         $mimeType = trim((string) ($record['mime_type'] ?? ''));
         if ($mimeType === '') {
             $mimeType = $this->detectMimeType($resolvedPath);

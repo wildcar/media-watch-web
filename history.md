@@ -5,6 +5,29 @@ starts.
 
 ---
 
+## 2026-04-27
+
+### Accept `kind=cartoon` (single-file, separate routing)
+
+**Why.** Cross-repo move: animated movies get a Cartoon-prefixed
+directory (`/mnt/storage/Media/Video/Cartoon/`) so Plex picks them up
+into the right library, and a 🎨 marker shows in the bot's `/list`.
+Detection happens server-side in `movie-metadata-mcp` based on TMDB
+genres + a Russian/English filename heuristic. Animated *series* stay
+as `series`.
+
+**What changed here.** `Api.php` and `Storage.php` previously coerced
+any non-`series` kind to `movie`. Now `cartoon` passes through
+unchanged. `collectFromDirectory` treats cartoon as movie-shaped
+(single-file pick from the directory; no episode parsing). API smoke
+test gained a `kind=cartoon` case asserting the kind round-trips and
+exactly one record is registered.
+
+**Deploy.** Routine `git pull` on the media host; PHP-FPM picks up
+the change without a reload.
+
+---
+
 ## 2026-04-26
 
 ### Register: season-in-dir + raw-numbered filename fallback
