@@ -281,6 +281,15 @@ final class MediaWatchStorage
         }
 
         $sharePath = $this->shareDir . DIRECTORY_SEPARATOR . $id . '.mp4';
+
+        // If a previous run already produced the share file, reuse it
+        // verbatim — re-spawning the remux worker on every re-register
+        // would otherwise stomp on a perfectly good output and waste
+        // an hour of ffmpeg on big releases.
+        if (is_file($sharePath) && filesize($sharePath) > 0) {
+            return ['status' => 'ready', 'share_path' => $sharePath, 'error' => ''];
+        }
+
         return ['status' => 'pending', 'share_path' => $sharePath, 'error' => ''];
     }
 
