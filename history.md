@@ -7,6 +7,27 @@ starts.
 
 ## 2026-04-27
 
+### `media_id`: accept `dl-<sha1[:12]>` for non-YouTube yt-dlp sources
+
+**Why.** Bot now downloads from yt-dlp's full extractor list (1800+
+sites). YouTube videos already had a typed slot (`yt-<video_id>`),
+but Vimeo / Twitch / TikTok / … don't have a canonical short id we
+can rely on. Using `dl-<sha1(url)[:12]>` gives the same composite
+shape with a stable per-URL key and 48 bits of entropy — collisions
+between different videos are negligible.
+
+**What.** `MEDIA_ID_REGEX` extended to match
+`dl-[a-f0-9]{12}` alongside the existing prefixes. Smoke-test
+covers it (`media_id=dl-a1b2c3d4e5f6` round-trips through register
+→ DB → response).
+
+**Deploy.** Routine `git pull` on the media host; PHP-FPM picks up
+the change on the next request.
+
+---
+
+## 2026-04-27
+
 ### Accept `kind=cartoon` (single-file, separate routing)
 
 **Why.** Cross-repo move: animated movies get a Cartoon-prefixed

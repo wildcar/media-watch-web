@@ -200,6 +200,16 @@ assert_eq(400, $code, 'missing media_id → 400');
 ], TOKEN);
 assert_eq(400, $code, 'bare imdb id (no prefix) → 400');
 
+// 10b) Generic yt-dlp media_id (dl-prefix) → 200.
+[$code, $body] = call('POST', '/api/register', [
+    'path' => $mediaRoot . '/Movie/Standalone.mp4',
+    'title' => 'TikTok clip',
+    'kind' => 'movie',
+    'media_id' => 'dl-a1b2c3d4e5f6',
+], TOKEN);
+assert_eq(200, $code, 'generic yt-dlp dl- media_id → 200');
+assert_eq('dl-a1b2c3d4e5f6', $body['records'][0]['id'], 'dl- media_id round-trips');
+
 // 11a) Cartoon kind: behaves like movie (single file from dir), but
 //     persists as kind=cartoon so the bot's /list shows the 🎨 marker
 //     and the dispatcher uses /Video/Cartoon/ on the rtorrent side.

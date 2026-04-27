@@ -27,9 +27,12 @@ final class MediaWatchApi
      *
      *   imdb-tt1234567   — IMDb-only references (rare; bot prefers rt- when there's a torrent)
      *   rt-6843582       — rutracker topic id (default for any rutracker download)
-     *   yt-dQw4w9WgXcQ   — YouTube video id (reserved; YouTube flow not implemented yet)
+     *   yt-dQw4w9WgXcQ   — YouTube video id
+     *   dl-a1b2c3d4e5f6  — generic yt-dlp source (Vimeo / Twitch / TikTok / …),
+     *                      sha1(canonical_url) truncated to 12 hex chars by the bot.
      */
-    private const MEDIA_ID_REGEX = '/^(imdb-tt\d{7,10}|rt-\d+|yt-[A-Za-z0-9_-]{6,32})$/';
+    private const MEDIA_ID_REGEX =
+        '/^(imdb-tt\d{7,10}|rt-\d+|yt-[A-Za-z0-9_-]{6,32}|dl-[a-f0-9]{12})$/';
 
     /** Tried in order; first hit wins. Capture order: season, episode. */
     private const EPISODE_PATTERNS = [
