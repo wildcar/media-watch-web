@@ -84,6 +84,11 @@ final class MediaWatchApi
             return;
         }
 
+        if ($method === 'GET' && $path === '/api/records') {
+            $this->handleListIds();
+            return;
+        }
+
         if ($method === 'DELETE' && preg_match('#^/api/records/([^/]+)/?$#', $path, $m) === 1) {
             $this->handleDelete(rawurldecode($m[1]));
             return;
@@ -236,6 +241,14 @@ final class MediaWatchApi
         }
 
         $this->respond(200, ['records' => $records, 'warnings' => $warnings]);
+    }
+
+    private function handleListIds(): void
+    {
+        // Lightweight: just the id list, no payload bloat. The bot
+        // diffs this against its own ``watch_records`` and prunes any
+        // entries the sweep already removed here.
+        $this->respond(200, ['ids' => $this->storage->listAllIds()]);
     }
 
     private function handleDelete(string $id): void

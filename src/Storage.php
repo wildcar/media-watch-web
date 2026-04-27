@@ -190,6 +190,52 @@ final class MediaWatchStorage
         return $out;
     }
 
+    /**
+     * Drop every record whose ``file_path`` no longer exists on disk.
+     * Also removes the matching share-mp4 (the remuxed copy under
+     * `MEDIA_WATCH_SHARE_DIR`) so it doesn't dangle. Returns the list
+     * of deleted record ids — useful for log / bot-side sync.
+     *
+     * @return list<string>
+     */
+    public function sweepMissing(): array
+    {
+        $deleted = [];
+        $rows = $this->pdo->query('SELECT id, file_path, share_path FROM records');
+        foreach ($rows as $row) {
+            $filePath = (string) $row['file_path'];
+            if ($filePath !== '' && is_file($filePath)) {
+                continue;
+            }
+            $id = (string) $row['id'];
+            $sharePath = (string) ($row['share_path'] ?? '');
+            if ($this->delete($id)) {
+                $deleted[] = $id;
+                if ($sharePath !== '' && is_file($sharePath)) {
+                    @unlink($sharePath);
+                }
+            }
+        }
+        return $deleted;
+    }
+
+    /**
+     * Lightweight list of every record id. Used by the bot's periodic
+     * sync to discover which on-disk files have already been swept by
+     * a separate housekeeping run; it diffs the result against its
+     * own ``watch_records`` and prunes anything no longer here.
+     *
+     * @return list<string>
+     */
+    public function listAllIds(): array
+    {
+        $out = [];
+        foreach ($this->pdo->query('SELECT id FROM records ORDER BY id') as $row) {
+            $out[] = (string) $row['id'];
+        }
+        return $out;
+    }
+
     public function delete(string $id): bool
     {
         $stmt = $this->pdo->prepare('DELETE FROM records WHERE id = :id');

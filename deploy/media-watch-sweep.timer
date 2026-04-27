@@ -1,0 +1,13 @@
+[Unit]
+Description=Hourly missing-file sweep for media-watch-web
+
+[Timer]
+# Hourly is a balance: fast enough that a manual file deletion shows
+# up in the catalogue within an hour, slow enough that the SQL scan
+# stays a non-event even on a 10k-record library.
+OnCalendar=hourly
+RandomizedDelaySec=5m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

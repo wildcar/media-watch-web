@@ -1,0 +1,10 @@
+[Unit]
+Description=media-watch-web: sweep records whose source files have been deleted
+Documentation=https://github.com/wildcar/media-watch-web
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/media-watch-web
+ExecStart=/usr/bin/php /opt/media-watch-web/bin/sweep-missing.php --quiet

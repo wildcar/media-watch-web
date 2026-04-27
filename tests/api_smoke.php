@@ -238,6 +238,14 @@ $episodes = array_map(static fn($r) => [(int) $r['season'], (int) $r['episode']]
 sort($episodes);
 assert_eq([[9, 1], [9, 2], [9, 23]], $episodes, 'season 9 episodes 1, 2, 23 (range → first)');
 
+// 11d) GET /api/records returns the id list of everything registered
+//      so far. Used by the bot's periodic prune.
+[$code, $body] = call('GET', '/api/records', null, TOKEN);
+assert_eq(200, $code, 'GET /api/records → 200');
+$ids = $body['ids'] ?? [];
+assert_eq(true, is_array($ids) && count($ids) > 0, 'records list non-empty');
+assert_eq(true, in_array('rt-6843582', $ids, true), 'recent record listed');
+
 // 12) DELETE.
 [$code, $body] = call('DELETE', '/api/records/rt-6843582', null, TOKEN);
 assert_eq(200, $code, 'delete returns 200');
@@ -245,5 +253,18 @@ assert_eq(true, $body['deleted'], 'deleted=true');
 
 [$code, $body] = call('DELETE', '/api/records/rt-6843582', null, TOKEN);
 assert_eq(404, $code, 'second delete returns 404');
+
+// 13) sweep-missing.php drops records whose file_path no longer exists.
+//     Ran last because it deletes a record several earlier tests built on.
+$idsBeforeSweep = (call('GET', '/api/records', null, TOKEN))[1]['ids'] ?? [];
+unlink($mediaRoot . '/Series/Show.S01.1080p/Show.S01E01.1080p.mkv');
+exec(sprintf(
+    'MEDIA_WATCH_DB_PATH=%s php %s --quiet 2>&1',
+    escapeshellarg($dbPath),
+    escapeshellarg($root . '/bin/sweep-missing.php')
+));
+$idsAfterSweep = (call('GET', '/api/records', null, TOKEN))[1]['ids'] ?? [];
+assert_eq(true, in_array('rt-9999999-s01e01', $idsBeforeSweep, true), 'episode listed before sweep');
+assert_eq(false, in_array('rt-9999999-s01e01', $idsAfterSweep, true), 'sweep removed orphaned episode');
 
 echo "all good\n";
