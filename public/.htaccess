@@ -12,5 +12,6 @@ RewriteRule ^ - [L]
 
 RewriteRule ^watch/([^/]+)/?$ watch.php?id=$1 [QSA,L,NC,B]
 RewriteRule ^stream/([^/]+)/?$ stream.php?id=$1 [QSA,L,NC,B]
+RewriteRule ^series/([^/]+)/?$ series.php?id=$1 [QSA,L,NC,B]
 RewriteRule ^api(/.*)?$ api.php [QSA,L]
 

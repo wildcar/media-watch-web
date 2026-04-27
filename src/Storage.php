@@ -135,6 +135,61 @@ final class MediaWatchStorage
         return $stored;
     }
 
+    /**
+     * List every episode-shaped record under a parent media id.
+     *
+     * The bot registers per-episode rows with composite ids like
+     * `rt-5273137-s09e01`; the parent has no record of its own. The
+     * series index page wants them ordered by season → episode and
+     * with the season/episode parsed out so the template doesn't have
+     * to repeat the regex. Returns an empty array when there are no
+     * matching rows (caller renders a 404).
+     *
+     * @return list<array{
+     *     id:string,title:string,watch_url:string,
+     *     season:int,episode:int,
+     *     duration_seconds:int,remux_status:string
+     * }>
+     */
+    public function listSeriesEpisodes(string $parentId): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, title, duration_seconds, remux_status
+               FROM records
+              WHERE id LIKE :prefix ESCAPE '\\'
+              ORDER BY id"
+        );
+        // SQLite LIKE is case-insensitive on ASCII; prefix-anchor with
+        // `<id>-s` to skip same-stem suffixes that might be added by
+        // collision logic (`-2`, `-3`).
+        $stmt->execute([':prefix' => $parentId . '-s%']);
+
+        $out = [];
+        foreach ($stmt as $row) {
+            $id = (string) $row['id'];
+            // Suffix shape: `<parent>-s<NN>e<NN>`. Anything else is
+            // either a non-episode oddity or a different parent id that
+            // happens to share the prefix; skip it.
+            if (preg_match('/-s(\d{1,2})e(\d{1,3})$/i', $id, $m) !== 1) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'title' => (string) $row['title'],
+                'season' => (int) $m[1],
+                'episode' => (int) $m[2],
+                'duration_seconds' => (int) $row['duration_seconds'],
+                'remux_status' => (string) $row['remux_status'],
+            ];
+        }
+        // Order: season ascending, then episode ascending.
+        usort(
+            $out,
+            static fn(array $a, array $b): int => [$a['season'], $a['episode']] <=> [$b['season'], $b['episode']]
+        );
+        return $out;
+    }
+
     public function delete(string $id): bool
     {
         $stmt = $this->pdo->prepare('DELETE FROM records WHERE id = :id');
