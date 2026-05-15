@@ -184,12 +184,27 @@ final class MediaWatchApi
             $season = $entry['season'] ?? null;
             $episode = $entry['episode'] ?? null;
 
-            if ($kind === 'series' && ($season === null || $episode === null)) {
+            // Defensive: even when the bot called us with kind=movie /
+            // cartoon, if the filename carries an SxxEyy marker we treat
+            // the file as a series episode and suffix the id accordingly.
+            // Otherwise a series the bot misclassified (e.g. metadata MCP
+            // returned `movie` for a one-episode tease) lands as
+            // `<media_id>` without the `-sNNeNN` suffix and merges with
+            // any other movie under the same parent id.
+            if ($kind !== 'series' && ($season === null || $episode === null)) {
+                $parsed = $this->parseEpisode(basename($file));
+                if ($parsed !== null) {
+                    [$season, $episode] = $parsed;
+                }
+            }
+            $isEpisode = $season !== null && $episode !== null;
+
+            if ($kind === 'series' && !$isEpisode) {
                 $warnings[] = sprintf('skipped: %s (no SxxEyy marker)', basename($file));
                 continue;
             }
 
-            $idCandidate = $kind === 'series'
+            $idCandidate = $isEpisode
                 ? sprintf('%s-s%02de%02d', $baseId, $season, $episode)
                 : $baseId;
 
@@ -200,7 +215,7 @@ final class MediaWatchApi
                 continue;
             }
 
-            $entryTitle = $kind === 'series'
+            $entryTitle = $isEpisode
                 ? sprintf('%s — S%02dE%02d', $title, $season, $episode)
                 : $title;
 
