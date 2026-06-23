@@ -3,30 +3,34 @@
 Small Apache + PHP application that exposes browser playback links for local
 video files already stored on the media host.
 
-The app does **not** upload video into Telegram and does **not** transcode.
-It serves files "as is" via HTTP Range responses and renders a watch page
-with Open Graph metadata so Telegram builds a rich preview for the link.
+The app does **not** upload video into Telegram. Browser-playable files stream
+**as is** over HTTP Range; files a browser can't play (e.g. an mkv) get a
+one-time background **remux** into an mp4 — the video stream is copied
+untouched and only the audio is re-encoded to stereo AAC, so there is no full
+transcode (truly incompatible video codecs are refused, not re-encoded). Watch
+pages carry Open Graph metadata so Telegram builds a rich preview for the link.
 
 Default public base URL: `https://v.sitename.org`
 
 ## Features
 
-- `GET /watch/<id>` — HTML page with:
-  - `og:title`
-  - `og:description`
-  - `og:image`
-  - `og:type=video.movie`
-  - `og:url`
-  - `twitter:card=summary_large_image`
-  - HTML5 `<video>` player pointing at `/stream/<id>`
-- `GET /stream/<id>` — file streaming with:
-  - MIME detection
-  - `Accept-Ranges: bytes`
-  - `Content-Range`
-  - `206 Partial Content`
-  - no transcoding
-- SQLite registry for title metadata and file paths
-- CLI registration script for future integration from `rtorrent-mcp`
+- `GET /watch/<id>` — HTML page with Open Graph / Twitter Card metadata
+  (`og:title`, `og:description`, `og:image`, `og:type=video.movie`, `og:url`,
+  `twitter:card`) and an HTML5 `<video>` player. Browser-playable files play
+  directly; non-playable ones show a "preparing" state until the background
+  remux is `ready`, then play the remuxed mp4.
+- `GET /series/<id>` — index page for a multi-episode series: episodes grouped
+  by season, each linking to its own `/watch/<id>` page.
+- `GET /stream/<id>` — file streaming with MIME detection, `Accept-Ranges`,
+  `Content-Range`, `206 Partial Content`, and no transcoding (serves the
+  original file, or the remuxed mp4 once it is `ready`).
+- HTTP registration API (Bearer-auth): `POST /api/register`,
+  `GET /api/records`, `DELETE /api/records/{id}`. Consumed by the Telegram bot
+  on download completion. A `register.php` / `delete.php` CLI does the same
+  from the shell.
+- SQLite registry for title metadata, file paths, and remux state. Hourly
+  `bin/sweep-missing.php` drops records whose file vanished from disk (and the
+  matching remuxed mp4).
 
 ## Repository Layout
 
@@ -38,19 +42,27 @@ media-watch-web/
 ├── AGENTS/
 ├── config.local.php.example
 ├── bin/
-│   ├── delete.php
-│   └── register.php
+│   ├── register.php            # CLI register (single file or directory)
+│   ├── delete.php              # CLI delete by id
+│   ├── remux-worker.php        # background mkv → mp4 remux
+│   ├── sweep-missing.php       # hourly: drop records whose file is gone
+│   ├── backfill-dimensions.php # one-off: fill video_width/height
+│   ├── backfill-remux.php      # one-off: queue remux for old records
+│   └── wipe-records.php        # maintenance: clear the registry
 ├── deploy/
 │   ├── apache-vhost.conf
 │   └── README.md
 ├── public/
-│   ├── .htaccess
+│   ├── .htaccess               # rewrites /watch /stream /series /api
 │   ├── index.php
+│   ├── watch.php
+│   ├── series.php
 │   ├── stream.php
-│   └── watch.php
+│   └── api.php
 ├── src/
-│   ├── Storage.php
-│   ├── Streamer.php
+│   ├── Storage.php             # SQLite registry + remux decision
+│   ├── Streamer.php            # range streaming
+│   ├── Api.php                 # HTTP API handler
 │   └── bootstrap.php
 └── var/
     └── .gitkeep
@@ -175,9 +187,21 @@ curl -sS -X POST https://v.sitename.org/api/register \
   -d '{"path":"/mnt/.../Dune (2021)","title":"Дюна","kind":"movie","imdb_id":"tt1160419"}'
 ```
 
+### `GET /api/records`
+
+Lightweight — returns just the live list of registered ids:
+
+```json
+{ "ids": ["tt1160419", "yt-dQw4w9WgXcQ", "rt-6543210"] }
+```
+
+The bot polls this hourly and prunes any of its own watch links whose id has
+disappeared here (e.g. dropped by `sweep-missing.php`).
+
 ### `DELETE /api/records/{id}`
 
-Removes a single record. Returns `{ "id", "deleted": true|false }`.
+Removes a single record. Returns `{ "id", "deleted": true|false }` (`404` when
+the id was unknown).
 
 ## Local Development
 
@@ -202,4 +226,3 @@ Apache rewrite rules are provided under `public/.htaccess` for deployment.
 
 See [deploy/README.md](deploy/README.md). The intended host is the same one
 that runs `rtorrent` and stores the downloaded video files.
-
