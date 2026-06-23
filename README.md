@@ -33,8 +33,9 @@ Default public base URL: `https://v.sitename.org`
 ```text
 media-watch-web/
 ├── README.md
-├── history.md
-├── env.md
+├── AGENTS.md
+├── CLAUDE.md
+├── AGENTS/
 ├── config.local.php.example
 ├── bin/
 │   ├── delete.php
