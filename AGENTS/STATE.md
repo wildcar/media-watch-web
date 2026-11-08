@@ -15,10 +15,13 @@ an HTTP register/sweep API driven by the bot — no transcode, no Telegram uploa
 - Movie/series/cartoon register, remux-to-mp4 (stereo AAC), X-Sendfile downloads,
   OG/Telegram previews, and the hourly `media-watch-sweep.timer` are all live.
 - Harness migrated to the `agent-template` layout (PHP-flavoured).
+- 2026-11-08: `DELETE /api/records/{id}?purge=1` (cascade to episodes + unlink
+  share mp4s) pushed for the bot's `/torrents` delete-with-files; not yet pulled on
+  `homesrv`.
 
 ## Next
 
-- (when needed) nothing pending; the app follows whatever the bot registers.
+- `git pull --ff-only` on `homesrv` to ship `?purge=1`.
 
 ## Open questions
 

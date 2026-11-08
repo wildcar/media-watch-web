@@ -63,7 +63,11 @@ returns `503 api_disabled` (refuses to run as an open relay). `hash_equals` comp
     `503 api_disabled`.
 - **`GET /api/records`** — `{ids:[…]}`, lightweight id list; the bot diffs it against
   its own `watch_records` to prune entries the sweep removed.
-- **`DELETE /api/records/{id}`** — `{id, deleted: bool}`.
+- **`DELETE /api/records/{id}`** — `{id, deleted: bool}`; row only.
+  `?purge=1` → also every child id (`<id>-…`: series episodes, `-2` collision
+  suffixes; matched by `substr`, not `LIKE`) and each removed row's `share_path`
+  mp4; returns `{id, deleted, deleted_ids[], shares_removed}`. 404 when nothing
+  matched. The bot sends it when a download is deleted together with its files.
 
 ### `media_id` register regex
 

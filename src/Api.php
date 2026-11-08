@@ -273,6 +273,21 @@ final class MediaWatchApi
             $this->respond(400, ['error' => 'invalid_argument', 'message' => '`id` is required']);
             return;
         }
+        // ?purge=1 also removes child records (series episodes) and the
+        // remuxed share mp4s — the bot sends it when the download's files
+        // are being deleted. Plain DELETE keeps the old row-only semantics.
+        $purge = filter_var($_GET['purge'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        if ($purge) {
+            $result = $this->storage->purge($id, true);
+            $deleted = $result['ids'] !== [];
+            $this->respond($deleted ? 200 : 404, [
+                'id' => $id,
+                'deleted' => $deleted,
+                'deleted_ids' => $result['ids'],
+                'shares_removed' => $result['shares_removed'],
+            ]);
+            return;
+        }
         $deleted = $this->storage->delete($id);
         $this->respond($deleted ? 200 : 404, [
             'id' => $id,

@@ -236,6 +236,43 @@ final class MediaWatchStorage
         return $out;
     }
 
+    /**
+     * Delete a record *and everything derived from it*: with ``$cascade``
+     * also every child id (``<id>-sNNeNN`` episodes, ``<id>-2`` collision
+     * suffixes), and for each removed row its remuxed ``Share/<id>.mp4``.
+     * Used when the source download itself is being deleted, so the share
+     * copy must not linger until the hourly sweep.
+     *
+     * @return array{ids: list<string>, shares_removed: int}
+     */
+    public function purge(string $id, bool $cascade): array
+    {
+        $sql = 'SELECT id, share_path FROM records WHERE id = :id';
+        $params = [':id' => $id];
+        if ($cascade) {
+            // substr() instead of LIKE: ids may contain `_`, a LIKE wildcard.
+            $sql .= ' OR substr(id, 1, :n) = :prefix';
+            $params[':n'] = strlen($id) + 1;
+            $params[':prefix'] = $id . '-';
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $ids = [];
+        $shares = 0;
+        foreach ($stmt->fetchAll() as $row) {
+            $rowId = (string) $row['id'];
+            if (!$this->delete($rowId)) {
+                continue;
+            }
+            $ids[] = $rowId;
+            $sharePath = (string) ($row['share_path'] ?? '');
+            if ($sharePath !== '' && is_file($sharePath) && @unlink($sharePath)) {
+                $shares++;
+            }
+        }
+        return ['ids' => $ids, 'shares_removed' => $shares];
+    }
+
     public function delete(string $id): bool
     {
         $stmt = $this->pdo->prepare('DELETE FROM records WHERE id = :id');

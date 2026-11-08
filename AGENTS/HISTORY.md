@@ -5,6 +5,12 @@ cross-repo log is `../AGENTS/HISTORY.md`.
 
 ---
 
+## 2026-11-08 · DELETE /api/records/{id}?purge=1
+- What: `Storage::purge` drops the record plus child ids (`<id>-…`) and unlinks their share mp4s; exposed as `?purge=1` on DELETE.
+- Why: the bot's new `/torrents` «удалить с файлами» must also remove transcoded copies right away, not after the hourly sweep.
+- Files: `src/{Storage,Api}.php`, `tests/api_smoke.php`, `AGENTS/SPEC.md`.
+- Next: `git pull --ff-only` on `homesrv`.
+
 ## 2026-06-23 · Migrate harness to agent-template layout
 - What: Added PHP-flavoured `AGENTS.md` + `CLAUDE.md` pointer + `AGENTS/{SPEC,STATE,HISTORY,MEMORY,ENV}.md` + `docs/adr/TEMPLATE.md`; folded `history.md`→HISTORY, `env.md`→ENV.
 - Why: Adopt the workspace-standard harness in this (non-MCP) repo.

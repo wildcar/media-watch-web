@@ -254,6 +254,25 @@ assert_eq(true, $body['deleted'], 'deleted=true');
 [$code, $body] = call('DELETE', '/api/records/rt-6843582', null, TOKEN);
 assert_eq(404, $code, 'second delete returns 404');
 
+// 12b) DELETE ?purge=1 cascades to episode ids and unlinks share mp4s.
+$shareFile = $tmp . '/share-rt-12345.mp4';
+file_put_contents($shareFile, 'x');
+$pdo = new PDO('sqlite:' . $dbPath);
+$pdo->prepare('UPDATE records SET share_path = :p WHERE id = :id')
+    ->execute([':p' => $shareFile, ':id' => 'rt-12345-s09e01']);
+$pdo = null;
+[$code, $body] = call('DELETE', '/api/records/rt-12345?purge=1', null, TOKEN);
+assert_eq(200, $code, 'purge returns 200');
+$purged = $body['deleted_ids'] ?? [];
+sort($purged);
+assert_eq(['rt-12345-s09e01', 'rt-12345-s09e02', 'rt-12345-s09e23'], $purged, 'purge removed every episode');
+assert_eq(1, $body['shares_removed'], 'one share mp4 removed');
+assert_eq(false, is_file($shareFile), 'share file unlinked');
+$idsNow = (call('GET', '/api/records', null, TOKEN))[1]['ids'] ?? [];
+assert_eq(true, in_array('rt-9999999-s01e01', $idsNow, true), 'other series untouched by purge');
+[$code, $body] = call('DELETE', '/api/records/rt-12345?purge=1', null, TOKEN);
+assert_eq(404, $code, 'second purge returns 404');
+
 // 13) sweep-missing.php drops records whose file_path no longer exists.
 //     Ran last because it deletes a record several earlier tests built on.
 $idsBeforeSweep = (call('GET', '/api/records', null, TOKEN))[1]['ids'] ?? [];
